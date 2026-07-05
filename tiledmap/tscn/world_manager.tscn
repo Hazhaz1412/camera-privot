@@ -12,6 +12,7 @@
 
 [node name="GridMap" type="GridMap" parent="." unique_id=2096209570]
 mesh_library = SubResource("MeshLibrary_37kqa")
+metadata/_editor_floor_ = Vector3(0, -11, 0)
 
 [node name="BuildGrid" type="Node" parent="." unique_id=1337523806]
 script = ExtResource("2_37kqa")

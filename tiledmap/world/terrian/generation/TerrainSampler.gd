@@ -7,6 +7,9 @@ enum AnimalType {
 	COW,
 	FROG,
 	GOAT,
+	CHICKEN,
+	SHEEP,
+	PIG,
 }
 enum TreeType {
 	OAK,
@@ -16,6 +19,7 @@ enum TreeType {
 
 const RANDOM_TREE := 303
 const RANDOM_ANIMAL := 304
+const RANDOM_ANIMAL_TYPE := 305
 
 var _cfg: TerrainConfig
 var _noise: TerrainNoise
@@ -85,6 +89,13 @@ func sample_terrain(world_x: int, world_z: int) -> Dictionary:
 		_cfg.generation_seed
 	)
 
+	var animal_type_roll := TerrainUtils.random_01(
+		world_x,
+		world_z,
+		RANDOM_ANIMAL_TYPE,
+		_cfg.generation_seed
+	)
+
 	var is_spawn_area := (
 		Vector2(world_x, world_z).length()
 		< float(_cfg.spawn_protection_radius)
@@ -151,18 +162,16 @@ func sample_terrain(world_x: int, world_z: int) -> Dictionary:
 
 	else:
 
-		var animal_threshold := _get_animal_threshold(biome)
-
 		has_animal = (
 			not is_spawn_area
 			and not has_water
 			and surface_item == _cfg.grass_item
-			and animal_roll < animal_threshold
+			and animal_roll < _get_animal_threshold_flat()
 			and animal_density > 0.55
 		)
 
-	if has_animal:
-		animal_type = _get_animal_type(biome)
+	if has_animal and animal_type == AnimalType.NONE:
+		animal_type = _pick_animal_type(animal_type_roll)
 
 	return {
 		"surface_y": surface_y,
@@ -225,39 +234,18 @@ func _get_tree_threshold(biome: String) -> float:
 	return 0.95
 
 
-func _get_animal_threshold(biome: String) -> float:
-
-	match biome:
-
-		"forest":
-			return 0.040
-
-		"plains":
-			return 0.025
-
-		"swamp":
-			return 0.015
-
-		"rocky":
-			return 0.005
-
-	return 0.0
+func _get_animal_threshold_flat() -> float:
+	return 0.025
 
 
-func _get_animal_type(biome: String) -> AnimalType:
-
-	match biome:
-
-		"forest":
-			return AnimalType.RABBIT
-
-		"plains":
-			return AnimalType.COW
-
-		"swamp":
-			return AnimalType.FROG
-
-		"rocky":
-			return AnimalType.GOAT
-
-	return AnimalType.NONE
+func _pick_animal_type(roll: float) -> AnimalType:
+	# Tỉ lệ cố định, không phụ thuộc biome:
+	# chicken 30%, sheep 25%, cow 25%, pig 20%
+	if roll < 0.30:
+		return AnimalType.CHICKEN
+	elif roll < 0.55:
+		return AnimalType.SHEEP
+	elif roll < 0.80:
+		return AnimalType.COW
+	else:
+		return AnimalType.PIG

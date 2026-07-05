@@ -1,5 +1,5 @@
-class_name Cow
-extends VoxelActor
+class_name Chicken
+extends GroundActor
 
 var current_direction := Vector3.ZERO
 var change_timer := 0.0
@@ -10,12 +10,11 @@ func _physics_process(delta: float) -> void:
 		return
 
 	change_timer -= delta
-
 	if change_timer <= 0.0:
 		current_direction = _random_flat_direction()
 		change_timer = randf_range(2.0, 5.0)
 
-	move_in_direction(current_direction, delta)
+	move_on_grid(current_direction, delta)
 
 
 func _random_flat_direction() -> Vector3:

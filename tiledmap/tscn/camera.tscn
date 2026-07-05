@@ -39,12 +39,8 @@ size = 5.0
 
 [node name="Player" parent="." unique_id=1534766189 instance=ExtResource("2_tflrq")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
-ground_snap_up_tolerance = null
-ground_snap_down_tolerance = null
-surface_height_offset = null
-min_surface_y = null
-max_surface_y = null
-grid_map_path = null
+min_surface_y = -16
+max_surface_y = 48
 
 [node name="GridMap" type="GridMap" parent="." unique_id=1029862321]
 mesh_library = ExtResource("3_0p6pn")

@@ -1,6 +1,10 @@
 [gd_resource type="MeshLibrary" format=4 uid="uid://c0hvcka0umrsw"]
 
 [ext_resource type="Texture2D" uid="uid://d2xlscgg1me6j" path="res://pixel art/Floors_Tiles.png" id="1_ybqg3"]
+[ext_resource type="Texture2D" uid="uid://csrdavhyiun71" path="res://Terrain/3/256x256/Terrain/Terrain_06-256x256.png" id="2_8rkqg"]
+[ext_resource type="Texture2D" uid="uid://dv8sry1ltd5t4" path="res://Terrain/3/256x256/Stone/Stone_05-256x256.png" id="3_famsr"]
+[ext_resource type="Texture2D" uid="uid://cjc7y04xgvebe" path="res://Terrain/3/256x256/Terrain/Terrain_02-256x256.png" id="3_vejg3"]
+[ext_resource type="Texture2D" uid="uid://pmdf6k5c1iqs" path="res://Terrain/3/256x256/Elements/Elements_03-256x256.png" id="5_uk1wb"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_8rkqg"]
 atlas = ExtResource("1_ybqg3")
@@ -313,7 +317,8 @@ albedo_color = Color(0.62, 0.62, 0.58, 1)
 material = SubResource("StandardMaterial3D_build_block")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_clean_grass"]
-albedo_color = Color(0.23, 0.48, 0.24, 1)
+albedo_color = Color(0.4591639, 0.88954884, 0.47260064, 1)
+albedo_texture = ExtResource("2_8rkqg")
 roughness = 0.9
 
 [sub_resource type="BoxMesh" id="BoxMesh_clean_grass"]
@@ -321,6 +326,7 @@ material = SubResource("StandardMaterial3D_clean_grass")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_clean_dirt"]
 albedo_color = Color(0.43, 0.32, 0.22, 1)
+albedo_texture = ExtResource("3_vejg3")
 roughness = 0.95
 
 [sub_resource type="BoxMesh" id="BoxMesh_clean_dirt"]
@@ -328,6 +334,7 @@ material = SubResource("StandardMaterial3D_clean_dirt")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_clean_stone"]
 albedo_color = Color(0.36, 0.38, 0.37, 1)
+albedo_texture = ExtResource("3_famsr")
 roughness = 0.9
 
 [sub_resource type="BoxMesh" id="BoxMesh_clean_stone"]
@@ -336,6 +343,7 @@ material = SubResource("StandardMaterial3D_clean_stone")
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_water"]
 transparency = 1
 albedo_color = Color(0.18, 0.42, 0.82, 0.72)
+albedo_texture = ExtResource("5_uk1wb")
 roughness = 0.35
 
 [sub_resource type="BoxMesh" id="BoxMesh_water"]

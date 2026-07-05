@@ -1,4 +1,4 @@
-class_name Cow
+class_name Sheep
 extends GroundActor
 
 @export var wander_radius_blocks := 50.0
@@ -10,7 +10,7 @@ var _home_position := Vector3.ZERO
 
 func _ready() -> void:
 	super._ready()
-	move_speed = 2.0  
+	move_speed = 1.5  
 	_home_position = global_position
 	_pick_new_wander_direction()
 
@@ -30,7 +30,6 @@ func _physics_process(delta: float) -> void:
 func _pick_new_wander_direction() -> void:
 	_wander_timer = randf_range(2.0, 5.0)
 
-	# Small chance to just stand still for this interval.
 	if randf() < 0.25:
 		_wander_direction = Vector3.ZERO
 		return
@@ -40,7 +39,6 @@ func _pick_new_wander_direction() -> void:
 	var max_distance := wander_radius_blocks
 
 	if distance_from_home >= max_distance:
-		# Too far: bias direction back toward home instead of fully random.
 		var back_direction := Vector3(-offset_from_home.x, 0.0, -offset_from_home.z).normalized()
 		var angle_spread := randf_range(-PI / 4.0, PI / 4.0)
 		_wander_direction = back_direction.rotated(Vector3.UP, angle_spread)

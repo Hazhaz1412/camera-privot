@@ -1,28 +1,48 @@
-extends CharacterBody3D
+class_name Chicken
+extends GroundActor
+
+@export var wander_radius_blocks := 50.0
+
+var _wander_direction := Vector3.ZERO
+var _wander_timer := 0.0
+var _home_position := Vector3.ZERO
 
 
-const SPEED = 5.0
-const JUMP_VELOCITY = 4.5
+func _ready() -> void:
+	super._ready()
+	move_speed = 1.2  
+	_home_position = global_position
+	_pick_new_wander_direction()
 
 
 func _physics_process(delta: float) -> void:
-	# Add the gravity.
-	if not is_on_floor():
-		velocity += get_gravity() * delta
+	_wander_timer -= delta
+	if _wander_timer <= 0.0:
+		_pick_new_wander_direction()
 
-	# Handle jump.
-	if Input.is_action_just_pressed("ui_accept") and is_on_floor():
-		velocity.y = JUMP_VELOCITY
+	move_on_grid(_wander_direction, delta)
 
-	# Get the input direction and handle the movement/deceleration.
-	# As good practice, you should replace UI actions with custom gameplay actions.
-	var input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
-	if direction:
-		velocity.x = direction.x * SPEED
-		velocity.z = direction.z * SPEED
+	if _wander_direction.length_squared() > 0.0001:
+		var target_rotation := atan2(_wander_direction.x, _wander_direction.z)
+		rotation.y = lerp_angle(rotation.y, target_rotation, 6.0 * delta)
+
+
+func _pick_new_wander_direction() -> void:
+	_wander_timer = randf_range(1.5, 4.0)
+
+	# Chicken pauses more often and for shorter random bursts.
+	if randf() < 0.35:
+		_wander_direction = Vector3.ZERO
+		return
+
+	var offset_from_home := global_position - _home_position
+	var distance_from_home := Vector2(offset_from_home.x, offset_from_home.z).length()
+	var max_distance := wander_radius_blocks
+
+	if distance_from_home >= max_distance:
+		var back_direction := Vector3(-offset_from_home.x, 0.0, -offset_from_home.z).normalized()
+		var angle_spread := randf_range(-PI / 4.0, PI / 4.0)
+		_wander_direction = back_direction.rotated(Vector3.UP, angle_spread)
 	else:
-		velocity.x = move_toward(velocity.x, 0, SPEED)
-		velocity.z = move_toward(velocity.z, 0, SPEED)
-
-	move_and_slide()
+		var angle := randf() * TAU
+		_wander_direction = Vector3(sin(angle), 0.0, cos(angle))
