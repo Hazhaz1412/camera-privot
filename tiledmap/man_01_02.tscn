@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://ch2vy8ettciuq"]
+
+[ext_resource type="PackedScene" path="res://Character/Man_01_02.fbx" id="1_ky6kw"]
+
+[node name="Man_01_02" unique_id=368718187 instance=ExtResource("1_ky6kw")]

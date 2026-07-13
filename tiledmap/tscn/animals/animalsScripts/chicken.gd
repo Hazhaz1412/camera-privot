@@ -1,4 +1,4 @@
-class_name Chicken
+class_name ChickenWander
 extends GroundActor
 
 @export var wander_radius_blocks := 50.0
