@@ -38,8 +38,9 @@ func setup(cfg: TerrainConfig) -> void:
 
 	tree_density_noise.seed = cfg.generation_seed + 303
 	tree_density_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	tree_density_noise.frequency = 0.075
-	tree_density_noise.fractal_octaves = 2
+	tree_density_noise.frequency = 0.026
+	tree_density_noise.fractal_octaves = 3
+	tree_density_noise.fractal_gain = 0.48
 
 	# animals
 	animal_density_noise = FastNoiseLite.new()

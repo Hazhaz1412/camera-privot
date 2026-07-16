@@ -6,6 +6,9 @@ extends Resource
 @export var load_margin_chunks := 1
 @export var fallback_chunk_radius := 2
 @export var stream_update_interval := 0.12
+@export var max_chunk_loads_per_frame := 1
+@export var max_chunk_unloads_per_frame := 2
+@export var overlay_rebuild_delay := 0.08
 @export var clear_grid_on_ready := true
 
 # --- Generation seed & thresholds ---

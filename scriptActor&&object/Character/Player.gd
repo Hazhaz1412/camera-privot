@@ -11,21 +11,35 @@ extends GroundActor
 @export var idle_animation := &"Idle_breath"
 @export var walk_animation := &"Walk"
 @export var animation_blend_time := 0.15
+@export var inventory_path: NodePath = ^"Inventory"
+@export var pickup_distance := 2.25
+@export var interaction_distance := 2.75
 
 @onready var camera_pivot: Node3D = get_node_or_null(camera_pivot_path)
 @onready var build_grid: Node = get_node_or_null(build_grid_path)
 @onready var visual_root: Node3D = get_node_or_null(visual_root_path)
 @onready var animation_player: AnimationPlayer = get_node_or_null(animation_player_path)
 @onready var model_root: Node = get_node_or_null(model_root_path)
+@onready var inventory: InventoryData = get_node_or_null(inventory_path) as InventoryData
 
 var animations_sanitized := false
 var resolved_idle_animation := &""
 var resolved_walk_animation := &""
+var inventory_open := false
+var active_tool_id := ""
+
+const TOOL_ORDER := ["stone_axe", "stone_pickaxe", "stone_hammer"]
 
 
 func _ready():
 	super._ready()
 	_resolve_nodes()
+	if inventory == null:
+		inventory = get_node_or_null(inventory_path) as InventoryData
+	if inventory != null and inventory.has_signal("inventory_changed"):
+		var validate_callable := Callable(self, "_validate_active_tool")
+		if not inventory.is_connected("inventory_changed", validate_callable):
+			inventory.connect("inventory_changed", validate_callable)
 	_setup_animation_player()
 	if Engine.is_editor_hint():
 		set_process(true)
@@ -52,6 +66,8 @@ func _physics_process(delta):
 			return
 
 	var input_dir := _get_move_input()
+	if inventory_open:
+		input_dir = Vector2.ZERO
 	if disable_movement_in_build_mode and _is_build_mode_enabled():
 		input_dir = Vector2.ZERO
 
@@ -63,6 +79,27 @@ func _physics_process(delta):
 	_update_animation()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if Engine.is_editor_hint() or inventory_open:
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F:
+		cycle_active_tool()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+		if _try_interact_nearest(event.shift_pressed):
+			get_viewport().set_input_as_handled()
+		return
+	if (
+		event is InputEventMouseButton
+		and event.pressed
+		and event.button_index == MouseButton.MOUSE_BUTTON_LEFT
+		and not _is_build_mode_enabled()
+	):
+		if _use_active_tool():
+			get_viewport().set_input_as_handled()
+
+
 func _resolve_nodes():
 	if camera_pivot == null:
 		camera_pivot = get_node_or_null(camera_pivot_path)
@@ -72,6 +109,219 @@ func _resolve_nodes():
 		animation_player = get_node_or_null(animation_player_path)
 	if model_root == null:
 		model_root = get_node_or_null(model_root_path)
+	if inventory == null:
+		inventory = get_node_or_null(inventory_path) as InventoryData
+
+
+func set_inventory_open(open: bool) -> void:
+	inventory_open = open
+	if inventory_open:
+		velocity.x = 0.0
+		velocity.z = 0.0
+
+
+func is_inventory_open() -> bool:
+	return inventory_open
+
+
+func get_nearest_pickup() -> Node3D:
+	if inventory_open:
+		return null
+	var nearest: Node3D = null
+	var nearest_distance_sq := pickup_distance * pickup_distance
+	for candidate in get_tree().get_nodes_in_group("world_pickup"):
+		if not candidate is Node3D or not is_instance_valid(candidate):
+			continue
+		var distance_sq := global_position.distance_squared_to(candidate.global_position)
+		if distance_sq > nearest_distance_sq:
+			continue
+		nearest = candidate
+		nearest_distance_sq = distance_sq
+	return nearest
+
+
+func is_pickup_interaction_available() -> bool:
+	return get_nearest_pickup() != null
+
+
+func _try_pickup_nearest() -> bool:
+	if inventory == null:
+		return false
+	var pickup := get_nearest_pickup()
+	if pickup == null:
+		return false
+	var item_id := String(pickup.get("item_id"))
+	if not inventory.try_add_item(item_id):
+		return false
+	if pickup.has_method("collect"):
+		pickup.collect()
+	return true
+
+
+func drop_inventory_item(uid: int) -> Dictionary:
+	if inventory == null:
+		return {"success": false, "reason": "Không tìm thấy túi đồ."}
+	var item := inventory.get_item_by_uid(uid)
+	if item.is_empty():
+		return {"success": false, "reason": "Vật phẩm không còn trong túi."}
+
+	var item_id := String(item["item_id"])
+	var pickup := WorldPickup.new()
+	get_parent().add_child(pickup)
+	pickup.setup(item_id, "dropped:%d:%d" % [Time.get_ticks_usec(), uid])
+
+	var forward := Vector3.FORWARD
+	if visual_root != null:
+		forward = visual_root.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() < 0.0001:
+		forward = Vector3.FORWARD
+	forward = forward.normalized()
+	pickup.global_position = global_position + forward * 1.35 + Vector3.UP * 0.12
+
+	if not inventory.try_remove_item_by_uid(uid):
+		pickup.queue_free()
+		return {"success": false, "reason": "Không thể vứt vật phẩm."}
+
+	return {
+		"success": true,
+		"reason": "Đã vứt %s ra trước mặt." % ItemCatalog.get_display_name(item_id),
+		"pickup": pickup,
+	}
+
+
+func get_nearest_placed_object() -> PlacedBuildObject:
+	var nearest: PlacedBuildObject = null
+	var nearest_distance_sq := interaction_distance * interaction_distance
+	for candidate in get_tree().get_nodes_in_group("placed_build_object"):
+		if not candidate is PlacedBuildObject or not is_instance_valid(candidate):
+			continue
+		var distance_sq := global_position.distance_squared_to(candidate.global_position)
+		if distance_sq > nearest_distance_sq:
+			continue
+		nearest = candidate
+		nearest_distance_sq = distance_sq
+	return nearest
+
+
+func get_interaction_prompt() -> String:
+	var pickup := get_nearest_pickup()
+	if pickup != null:
+		return "[E] Nhặt %s" % ItemCatalog.get_display_name(String(pickup.get("item_id")))
+	var placed := get_nearest_placed_object()
+	return placed.get_interaction_prompt() if placed != null else ""
+
+
+func _try_interact_nearest(alternate := false) -> bool:
+	if _try_pickup_nearest():
+		return true
+	var placed := get_nearest_placed_object()
+	if placed == null:
+		return false
+	placed.interact(self, alternate)
+	return true
+
+
+func cycle_active_tool() -> void:
+	var available_tools: Array[String] = []
+	for tool_id: String in TOOL_ORDER:
+		if inventory != null and inventory.count_item(tool_id) > 0:
+			available_tools.append(tool_id)
+	if available_tools.is_empty():
+		active_tool_id = ""
+		show_interaction_message("Chưa có công cụ. Hãy chế tạo Rìu, Cuốc hoặc Búa đá.", false)
+		return
+	var current_index := available_tools.find(active_tool_id)
+	active_tool_id = available_tools[(current_index + 1) % available_tools.size()]
+	show_interaction_message("Đã trang bị %s." % ItemCatalog.get_display_name(active_tool_id), true)
+
+
+func get_tool_hud_text() -> String:
+	_validate_active_tool()
+	if active_tool_id.is_empty():
+		return "[F] Chọn công cụ"
+	var action := "Chặt gỗ" if active_tool_id == "stone_axe" else "Khai thác" if active_tool_id == "stone_pickaxe" else "Hỗ trợ máy"
+	return "[F] %s  •  [Chuột trái] %s" % [ItemCatalog.get_display_name(active_tool_id), action]
+
+
+func _validate_active_tool() -> void:
+	if not active_tool_id.is_empty() and (inventory == null or inventory.count_item(active_tool_id) <= 0):
+		active_tool_id = ""
+
+
+func _use_active_tool() -> bool:
+	_validate_active_tool()
+	if active_tool_id.is_empty():
+		cycle_active_tool()
+		return true
+	if active_tool_id == "stone_hammer":
+		var placed := get_nearest_factory_machine()
+		if placed == null or not placed.apply_hammer_boost():
+			show_interaction_message("Búa chỉ tăng tốc khi đứng gần một máy đang chạy.", false)
+			return true
+		show_interaction_message("Đã dùng Búa đá hỗ trợ máy +1.25 giây.", true)
+		return true
+
+	var allowed_items: Array = ["wood", "stick"] if active_tool_id == "stone_axe" else ["stone", "coal", "iron_ore"]
+	var target := _get_nearest_pickup_matching(allowed_items)
+	if target == null:
+		show_interaction_message(
+			"Rìu dùng cho gỗ/que." if active_tool_id == "stone_axe" else "Cuốc dùng cho đá, than và quặng sắt.",
+			false
+		)
+		return true
+	var harvested_item_id := String(target.get("item_id"))
+	if inventory == null or not inventory.try_add_items({harvested_item_id: 2}):
+		show_interaction_message("Túi không đủ chỗ để thu hoạch.", false)
+		return true
+	if target.has_method("collect"):
+		target.collect()
+	show_interaction_message("Thu hoạch hiệu quả: %s ×2." % ItemCatalog.get_display_name(harvested_item_id), true)
+	return true
+
+
+func get_nearest_factory_machine() -> PlacedBuildObject:
+	var nearest: PlacedBuildObject = null
+	var nearest_distance_sq := interaction_distance * interaction_distance
+	for candidate in get_tree().get_nodes_in_group("placed_build_object"):
+		if not candidate is PlacedBuildObject or not is_instance_valid(candidate):
+			continue
+		if not FactoryRecipeCatalog.is_machine(candidate.item_id):
+			continue
+		var distance_sq := global_position.distance_squared_to(candidate.global_position)
+		if distance_sq > nearest_distance_sq:
+			continue
+		nearest = candidate
+		nearest_distance_sq = distance_sq
+	return nearest
+
+
+func _get_nearest_pickup_matching(allowed_items: Array) -> Node3D:
+	var nearest: Node3D = null
+	var nearest_distance_sq := pickup_distance * pickup_distance
+	for candidate in get_tree().get_nodes_in_group("world_pickup"):
+		if not candidate is Node3D or not is_instance_valid(candidate):
+			continue
+		if String(candidate.get("item_id")) not in allowed_items:
+			continue
+		var distance_sq := global_position.distance_squared_to(candidate.global_position)
+		if distance_sq > nearest_distance_sq:
+			continue
+		nearest = candidate
+		nearest_distance_sq = distance_sq
+	return nearest
+
+
+func open_crafting_table(_table: PlacedBuildObject) -> void:
+	var ui := get_node_or_null("../UI") as InventoryUI
+	if ui != null:
+		ui.open_at_crafting_table()
+
+
+func show_interaction_message(message: String, success := true) -> void:
+	var ui := get_node_or_null("../UI") as InventoryUI
+	if ui != null:
+		ui.show_world_message(message, success)
 
 
 func _setup_animation_player():

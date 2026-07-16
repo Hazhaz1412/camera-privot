@@ -1,9 +1,10 @@
 [gd_scene format=3 uid="uid://cpx6sglq3cpq2"]
 
 [ext_resource type="PackedScene" uid="uid://ctd681n7f2c7y" path="res://scriptActor&&object/Character/Man_01_02.fbx" id="1_lgt04"]
-[ext_resource type="Script" uid="uid://drvfwxvru2o61" path="res://scriptActor&&object/Character/Player.gd" id="3_player"]
+[ext_resource type="Script" uid="uid://dhs2655m3013" path="res://scriptActor&&object/Character/Player.gd" id="3_player"]
 [ext_resource type="Animation" uid="uid://clenlird6g276" path="res://Animation/Idle_breath.res" id="3_ssuvf"]
 [ext_resource type="Animation" uid="uid://wu0rydiusnlr" path="res://Animation/walk.res" id="4_68rl5"]
+[ext_resource type="Script" path="res://inventory/InventoryData.gd" id="5_inventory"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_schp4"]
 radius = 0.35
@@ -19,6 +20,9 @@ _data = {
 
 [node name="CharacterBody3D" type="CharacterBody3D" unique_id=34599356]
 script = ExtResource("3_player")
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("5_inventory")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=726721089]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)

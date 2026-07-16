@@ -2,8 +2,6 @@ extends Node3D
 
 @export var move_speed := 10.0
 @export var zoom_speed := 1.5
-@export var rotate_speed := 90.0
-@export var pitch_speed := 60.0
 @export var mouse_rotate_sensitivity := 0.15
 
 @export_range(20.0, 85.0, 1.0) var min_pitch_degrees := 35.0
@@ -46,39 +44,21 @@ func _ready():
 
 func _process(delta):
 	_update_mouse_visibility()
+	if _is_inventory_open():
+		is_rotating_with_mouse = false
+		_update_follow_position(delta)
+		return
 
 	if _is_build_mode_enabled():
 		_update_build_pan_offset(delta)
 	else:
 		build_pan_offset = Vector3.ZERO
 
-	var yaw_input := 0
-	var pitch_input := 0
-
-	if Input.is_key_pressed(KEY_E):
-		yaw_input += 1
-	if Input.is_key_pressed(KEY_Q):
-		yaw_input -= 1
-	if Input.is_key_pressed(KEY_R):
-		pitch_input += 1
-	if Input.is_key_pressed(KEY_F):
-		pitch_input -= 1
-
-	if yaw_input != 0:
-		yaw_degrees += yaw_input * rotate_speed * delta
-	if pitch_input != 0:
-		pitch_degrees = clamp(
-			pitch_degrees + pitch_input * pitch_speed * delta,
-			min_pitch_degrees,
-			max_pitch_degrees
-		)
-
-	if yaw_input != 0 or pitch_input != 0:
-		_update_camera_transform()
-
 	_update_follow_position(delta)
 
 func _unhandled_input(event):
+	if _is_inventory_open():
+		return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MouseButton.MOUSE_BUTTON_WHEEL_UP:
 			camera.size = clamp(camera.size - zoom_speed, min_zoom, max_zoom)
@@ -191,6 +171,12 @@ func _get_top_terrain_y(cell_x: int, cell_z: int) -> int:
 
 
 func _update_mouse_visibility():
+	if _is_inventory_open():
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
+	if _is_build_mode_enabled():
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
 	if not hide_mouse_during_gameplay:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		return
@@ -209,3 +195,13 @@ func _is_build_mode_enabled() -> bool:
 		return false
 
 	return build_grid.is_build_mode_enabled()
+
+
+func _is_inventory_open() -> bool:
+	if follow_target == null:
+		follow_target = get_node_or_null(follow_target_path)
+	return (
+		follow_target != null
+		and follow_target.has_method("is_inventory_open")
+		and follow_target.is_inventory_open()
+	)

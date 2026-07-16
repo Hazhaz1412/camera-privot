@@ -9,6 +9,9 @@ extends Node
 @export var load_margin_chunks := 1
 @export var fallback_chunk_radius := 2
 @export var stream_update_interval := 0.12
+@export_range(1, 8, 1) var max_chunk_loads_per_frame := 1
+@export_range(1, 16, 1) var max_chunk_unloads_per_frame := 2
+@export_range(0.0, 0.5, 0.01) var overlay_rebuild_delay := 0.08
 @export var clear_grid_on_ready := true
 
 @export var generation_seed := 12345
@@ -85,8 +88,10 @@ func set_animal_spawner(spawner: AnimalSpawner) -> void:
 func generate(grid_map):
 	if _loader == null:
 		_wire_modules()
+	_streamer.reset()
 	if clear_grid_on_ready:
 		grid_map.clear()
+		_sampler.clear_cache()
 		_loader.loaded_chunks.clear()
 		_loader.rendered_cells_by_chunk.clear()
 		if _tree_spawner:
@@ -131,6 +136,12 @@ func get_saved_cell_count() -> int:
 	return _loader.get_saved_cell_count()
 
 
+func get_pending_chunk_count() -> int:
+	if _streamer == null:
+		return 0
+	return _streamer.get_pending_chunk_count()
+
+
 func get_surface_cell(
 	world_x: int,
 	world_z: int
@@ -154,6 +165,9 @@ func _build_config() -> void:
 	_cfg.load_margin_chunks = load_margin_chunks
 	_cfg.fallback_chunk_radius = fallback_chunk_radius
 	_cfg.stream_update_interval = stream_update_interval
+	_cfg.max_chunk_loads_per_frame = max_chunk_loads_per_frame
+	_cfg.max_chunk_unloads_per_frame = max_chunk_unloads_per_frame
+	_cfg.overlay_rebuild_delay = overlay_rebuild_delay
 	_cfg.clear_grid_on_ready = clear_grid_on_ready
 
 	_cfg.generation_seed = generation_seed

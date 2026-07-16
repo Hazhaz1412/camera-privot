@@ -92,7 +92,12 @@ func _try_move_axis(current_position: Vector3, axis_delta: Vector3) -> Vector3:
 		_zero_blocked_velocity(axis_delta)
 		return _snap_to_valid_surface(current_position, current_position.y)
 
-	if ObstacleRegistry.get_blocking_obstacle(candidate, body_radius, get_instance_id()):
+	if ObstacleRegistry.is_movement_blocked(
+		current_position,
+		candidate,
+		body_radius,
+		get_instance_id()
+	):
 		_zero_blocked_velocity(axis_delta)
 		return _snap_to_valid_surface(current_position, current_position.y)
 
@@ -178,6 +183,8 @@ func _try_snap_to_spawn_surface():
 
 func _find_spawn_surface_y(world_position: Vector3):
 	var footprint_cells := _get_footprint_cells(world_position)
+	if not _are_spawn_columns_loaded(footprint_cells):
+		return null
 
 	for y in range(max_surface_y, min_surface_y - 1, -1):
 		for cell_xz in footprint_cells:
@@ -190,6 +197,18 @@ func _find_spawn_surface_y(world_position: Vector3):
 				return player_y
 
 	return null
+
+
+func _are_spawn_columns_loaded(footprint_cells: Array[Vector2i]) -> bool:
+	for cell_xz in footprint_cells:
+		var column_has_floor := false
+		for y in range(max_surface_y, min_surface_y - 1, -1):
+			if _is_floor_cell(Vector3i(cell_xz.x, y, cell_xz.y)):
+				column_has_floor = true
+				break
+		if not column_has_floor:
+			return false
+	return true
 
 
 func _find_surface_y(

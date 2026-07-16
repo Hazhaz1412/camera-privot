@@ -15,6 +15,8 @@ static func _bucket_for(position: Vector3) -> Vector2i:
 
 
 static func register(id: int, position: Vector3, radius: float) -> void:
+	# Re-registering an id must not leave it behind in the previous bucket.
+	unregister(id)
 	var bucket := _bucket_for(position)
 	_obstacles[id] = {
 		"position": position,
@@ -79,6 +81,48 @@ static func get_blocking_obstacle(
 					return true
 
 	return false
+
+
+static func is_movement_blocked(
+	current_position: Vector3,
+	candidate_position: Vector3,
+	own_radius: float,
+	exclude_id: int
+) -> bool:
+	var center_bucket := _bucket_for(candidate_position)
+
+	for x_offset in range(-1, 2):
+		for z_offset in range(-1, 2):
+			var bucket := Vector2i(center_bucket.x + x_offset, center_bucket.y + z_offset)
+			if not _buckets.has(bucket):
+				continue
+
+			for id in _buckets[bucket].keys():
+				if id == exclude_id or not _obstacles.has(id):
+					continue
+
+				var obstacle: Dictionary = _obstacles[id]
+				var other_position: Vector3 = obstacle["position"]
+				var min_distance := own_radius + float(obstacle["radius"])
+				var candidate_distance_sq := _flat_distance_squared(candidate_position, other_position)
+				if candidate_distance_sq >= min_distance * min_distance:
+					continue
+
+				var current_distance_sq := _flat_distance_squared(current_position, other_position)
+				var already_overlapping := current_distance_sq < min_distance * min_distance
+				if already_overlapping and candidate_distance_sq > current_distance_sq + 0.000001:
+					# An animal may have stepped into the actor. Always allow a move that
+					# reduces penetration so neither actor can trap the other permanently.
+					continue
+				return true
+
+	return false
+
+
+static func _flat_distance_squared(a: Vector3, b: Vector3) -> float:
+	var dx := a.x - b.x
+	var dz := a.z - b.z
+	return dx * dx + dz * dz
 
 
 static func _add_to_bucket(bucket: Vector2i, id: int) -> void:

@@ -226,10 +226,6 @@ func _render_terrain_column(
 			grid_map.set_cell_item(cell, _cfg.tree_item)
 			rendered_cells.append(cell)
 
-		if _tree_spawner == null:
-			grid_map.set_cell_item(cell, _cfg.tree_item)
-			rendered_cells.append(cell)
-
 	if terrain["has_animal"]:
 
 		var cell := Vector3i(

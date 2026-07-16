@@ -7,6 +7,11 @@ var _overlay: BlockGridOverlay
 var _node_ref: Node
 
 var _stream_time := 0.0
+var _overlay_wait_time := 0.0
+var _wanted_chunks: Dictionary = {}
+var _pending_loads: Array[Vector2i] = []
+var _pending_unloads: Array[Vector2i] = []
+var _overlay_dirty := false
 
 
 func setup(cfg: TerrainConfig, loader: ChunkLoader, overlay: BlockGridOverlay, node_ref: Node) -> void:
@@ -16,33 +21,83 @@ func setup(cfg: TerrainConfig, loader: ChunkLoader, overlay: BlockGridOverlay, n
 	_node_ref = node_ref
 
 
+func reset() -> void:
+	_stream_time = 0.0
+	_overlay_wait_time = 0.0
+	_wanted_chunks.clear()
+	_pending_loads.clear()
+	_pending_unloads.clear()
+	_overlay_dirty = false
+
+
 func update_stream(grid_map: GridMap, delta: float, force := false) -> void:
 	_stream_time += delta
-	if not force and _stream_time < _cfg.stream_update_interval:
-		return
+	_overlay_wait_time += delta
+	if force or _stream_time >= _cfg.stream_update_interval:
+		_stream_time = 0.0
+		_refresh_work_queue(grid_map)
 
-	_stream_time = 0.0
-	var wanted_chunks := _get_wanted_chunks(grid_map)
-	var changed := false
+	_process_streaming_budget(grid_map)
+	_try_rebuild_overlay(grid_map)
 
-	# Load chunks mới
-	for chunk_coord in wanted_chunks.keys():
+
+func get_pending_chunk_count() -> int:
+	return _pending_loads.size() + _pending_unloads.size()
+
+
+func _refresh_work_queue(grid_map: GridMap) -> void:
+	var bounds := _get_visible_cell_bounds(grid_map)
+	_wanted_chunks = _get_wanted_chunks_for_bounds(bounds)
+	_pending_loads.clear()
+	_pending_unloads.clear()
+
+	for chunk_coord: Vector2i in _wanted_chunks.keys():
 		if not _loader.loaded_chunks.has(chunk_coord):
+			_pending_loads.append(chunk_coord)
+
+	for chunk_coord: Vector2i in _loader.loaded_chunks.keys():
+		if not _wanted_chunks.has(chunk_coord):
+			_pending_unloads.append(chunk_coord)
+
+	var center_chunk := _get_priority_center_chunk(grid_map, bounds)
+	_pending_loads.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return _chunk_distance_squared(a, center_chunk) < _chunk_distance_squared(b, center_chunk)
+	)
+	_pending_unloads.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return _chunk_distance_squared(a, center_chunk) > _chunk_distance_squared(b, center_chunk)
+	)
+
+
+func _process_streaming_budget(grid_map: GridMap) -> void:
+	var changed := false
+	var unload_count: int = mini(_cfg.max_chunk_unloads_per_frame, _pending_unloads.size())
+	for _index in range(unload_count):
+		var chunk_coord: Vector2i = _pending_unloads.pop_front()
+		if _loader.loaded_chunks.has(chunk_coord) and not _wanted_chunks.has(chunk_coord):
+			_loader.unload_chunk(grid_map, chunk_coord)
+			changed = true
+
+	var load_count: int = mini(_cfg.max_chunk_loads_per_frame, _pending_loads.size())
+	for _index in range(load_count):
+		var chunk_coord: Vector2i = _pending_loads.pop_front()
+		if _wanted_chunks.has(chunk_coord) and not _loader.loaded_chunks.has(chunk_coord):
 			_loader.load_chunk(grid_map, chunk_coord)
 			changed = true
 
-	# FIX: Không iterate và xóa loaded_chunks cùng lúc — snapshot keys trước
-	var to_unload: Array = []
-	for chunk_coord in _loader.loaded_chunks.keys():
-		if not wanted_chunks.has(chunk_coord):
-			to_unload.append(chunk_coord)
-
-	for chunk_coord in to_unload:
-		_loader.unload_chunk(grid_map, chunk_coord)
-		changed = true
-
 	if changed:
-		_overlay.rebuild(grid_map, _loader.rendered_cells_by_chunk)
+		_overlay_dirty = true
+		_overlay_wait_time = 0.0
+
+
+func _try_rebuild_overlay(grid_map: GridMap) -> void:
+	if not _overlay_dirty:
+		return
+	if not _pending_loads.is_empty() or not _pending_unloads.is_empty():
+		return
+	if _overlay_wait_time < _cfg.overlay_rebuild_delay:
+		return
+	_overlay.rebuild(grid_map, _loader.rendered_cells_by_chunk)
+	_overlay_dirty = false
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +106,10 @@ func update_stream(grid_map: GridMap, delta: float, force := false) -> void:
 
 func _get_wanted_chunks(grid_map: GridMap) -> Dictionary:
 	var bounds := _get_visible_cell_bounds(grid_map)
+	return _get_wanted_chunks_for_bounds(bounds)
+
+
+func _get_wanted_chunks_for_bounds(bounds: Dictionary) -> Dictionary:
 	var min_chunk := TerrainUtils.chunk_coord_for_cell(bounds["min_x"], bounds["min_z"], _cfg.chunk_size)
 	var max_chunk := TerrainUtils.chunk_coord_for_cell(bounds["max_x"], bounds["max_z"], _cfg.chunk_size)
 	var wanted := {}
@@ -60,6 +119,24 @@ func _get_wanted_chunks(grid_map: GridMap) -> Dictionary:
 			wanted[Vector2i(chunk_x, chunk_z)] = true
 
 	return wanted
+
+
+func _chunk_distance_squared(a: Vector2i, b: Vector2i) -> int:
+	var delta := a - b
+	return delta.x * delta.x + delta.y * delta.y
+
+
+func _get_priority_center_chunk(grid_map: GridMap, bounds: Dictionary) -> Vector2i:
+	var player := _node_ref.get_node_or_null("../../Player") as Node3D
+	if player != null:
+		var player_cell := grid_map.local_to_map(grid_map.to_local(player.global_position))
+		return TerrainUtils.chunk_coord_for_cell(player_cell.x, player_cell.z, _cfg.chunk_size)
+
+	var center_cell := Vector2i(
+		roundi((float(bounds["min_x"]) + float(bounds["max_x"])) * 0.5),
+		roundi((float(bounds["min_z"]) + float(bounds["max_z"])) * 0.5)
+	)
+	return TerrainUtils.chunk_coord_for_cell(center_cell.x, center_cell.y, _cfg.chunk_size)
 
 
 func _get_visible_cell_bounds(grid_map: GridMap) -> Dictionary:

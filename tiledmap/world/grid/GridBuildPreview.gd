@@ -52,6 +52,35 @@ func show_target(
 	footprint_material.albedo_color = footprint_color if can_place else blocked_preview_color
 
 
+func show_placeable(
+	grid_map: GridMap,
+	placement_rules: Node,
+	cell: Vector3i,
+	placeable: Dictionary,
+	can_place: bool
+) -> void:
+	_ensure_preview_nodes()
+	var footprint: Vector2i = placeable.get("footprint", Vector2i.ONE)
+	var height := float(placeable.get("height", 1.0))
+	var block_mesh := block_preview.mesh as BoxMesh
+	block_mesh.size = Vector3(float(footprint.x) * 0.92, height, float(footprint.y) * 0.92)
+	block_preview.visible = true
+	var center: Vector3 = placement_rules.get_block_visual_center(grid_map, cell)
+	center.x += float(footprint.x - 1) * grid_map.cell_size.x * 0.5
+	center.z += float(footprint.y - 1) * grid_map.cell_size.z * 0.5
+	center.y = grid_map.map_to_local(cell).y - grid_map.cell_size.y + height * 0.5
+	block_preview.position = center
+	var base_color: Color = placeable.get("color", valid_preview_color)
+	base_color.a = 0.38
+	block_material.albedo_color = base_color if can_place else blocked_preview_color
+
+	var footprint_mesh := footprint_preview.mesh as BoxMesh
+	footprint_mesh.size = Vector3(float(footprint.x) * 0.96, 0.02, float(footprint.y) * 0.96)
+	footprint_preview.visible = true
+	footprint_preview.position = Vector3(center.x, grid_map.map_to_local(cell).y - grid_map.cell_size.y + 0.025, center.z)
+	footprint_material.albedo_color = footprint_color if can_place else blocked_preview_color
+
+
 func hide_preview() -> void:
 	_ensure_preview_nodes()
 	block_preview.visible = false

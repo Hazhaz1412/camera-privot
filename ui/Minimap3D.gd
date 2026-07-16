@@ -48,6 +48,7 @@ class MinimapOverlay:
 @export var follow_lerp_speed := 14.0
 @export var focus_height_offset := 1.2
 @export var zoom_step := 4.0
+@export_range(5.0, 30.0, 1.0) var render_fps := 15.0
 
 @onready var player: Node3D = get_node_or_null(player_path)
 @onready var player_visual: Node3D = get_node_or_null(player_visual_path)
@@ -61,6 +62,7 @@ var minimap_camera: Camera3D
 var overlay: MinimapOverlay
 var focus_position := Vector3.ZERO
 var has_focus_position := false
+var _render_time := 0.0
 
 
 func _ready():
@@ -71,9 +73,17 @@ func _ready():
 
 
 func _process(delta: float):
+	_render_time += delta
+	var render_interval := 1.0 / maxf(render_fps, 1.0)
+	if _render_time < render_interval:
+		return
+	var update_delta := _render_time
+	_render_time = 0.0
 	_resolve_scene_nodes()
 	_resize_subviewport()
-	_update_minimap_camera(delta)
+	_update_minimap_camera(update_delta)
+	if sub_viewport != null:
+		sub_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _configure_panel():
@@ -151,7 +161,7 @@ func _build_minimap_ui():
 
 	sub_viewport = SubViewport.new()
 	sub_viewport.size = viewport_size
-	sub_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	sub_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	sub_viewport.transparent_bg = false
 	sub_viewport.own_world_3d = false
 	viewport_container.add_child(sub_viewport)

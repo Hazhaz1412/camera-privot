@@ -42,6 +42,7 @@ func despawn_animals_for_chunk(chunk_coord: Vector2i) -> void:
 		return
 	for animal: Node3D in _animals_by_chunk[chunk_coord]:
 		if is_instance_valid(animal):
+			ObstacleRegistry.unregister(animal.get_instance_id())
 			animal.queue_free()
 	_animals_by_chunk.erase(chunk_coord)
 func clear_all() -> void:

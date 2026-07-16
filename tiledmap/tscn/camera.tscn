@@ -18,6 +18,7 @@
 [ext_resource type="PackedScene" uid="uid://cx73t3m6j3710" path="res://tiledmap/tscn/animals/cow.tscn" id="16_jyycu"]
 [ext_resource type="PackedScene" uid="uid://bfhet322lxsq2" path="res://tiledmap/tscn/animals/pig.tscn" id="17_gjvob"]
 [ext_resource type="PackedScene" uid="uid://byueebvvq5wf3" path="res://tiledmap/tscn/animals/white_sheep.tscn" id="18_u40ej"]
+[ext_resource type="Script" path="res://world_items/ResourceSpawner.gd" id="19_resources"]
 
 [node name="World" type="Node3D" unique_id=408228230]
 
@@ -89,3 +90,6 @@ chicken_scene = ExtResource("15_u40ej")
 pig_scene = ExtResource("17_gjvob")
 cow_scene = ExtResource("16_jyycu")
 sheep_scene = ExtResource("18_u40ej")
+
+[node name="ResourceSpawner" type="Node3D" parent="."]
+script = ExtResource("19_resources")
